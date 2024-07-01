@@ -1,8 +1,5 @@
 import {
   App,
-  Editor,
-  MarkdownView,
-  Modal,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -18,11 +15,22 @@ import { OTPView, VIEW_TYPE_OTP } from './otp-view';
 interface MyPluginSettings {
   mySetting: string;
   jwtToken: string | null;
+  createSeparateNotes: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
   mySetting: 'default',
-  jwtToken: null,
+  jwtToken: 'testing test',
+  createSeparateNotes: false,
+};
+
+type Upload = {
+  id: string;
+  userId: string;
+  label?: string;
+  url: string;
+  transcription: string;
+  createdAt?: Date;
 };
 
 export default class MyPlugin extends Plugin {
@@ -69,8 +77,8 @@ export default class MyPlugin extends Plugin {
       }
       this.authRequestId = res.auth_request_id;
       new Notice('OTP sent to your email.');
-      this.app.workspace.detachLeavesOfType(VIEW_TYPE_EMAIL);
       this.openOTPView();
+      this.app.workspace.detachLeavesOfType(VIEW_TYPE_EMAIL);
     } catch (err) {
       new Notice(err.message || 'Unknown error');
     }
@@ -102,10 +110,9 @@ export default class MyPlugin extends Plugin {
       }
 
       this.jwtToken = res.jwt_token;
-      new Notice(`${this.jwtToken}`, 3000);
 
-      this.settings.jwtToken = res.jwt_token; // Store the JWT token in settings
-      await this.saveSettings(); // Save settings to persist jwtToken
+      this.settings.jwtToken = res.jwt_token;
+      await this.saveSettings();
 
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OTP);
       new Notice('Login successful!');
@@ -114,24 +121,99 @@ export default class MyPlugin extends Plugin {
     }
   }
 
+  async fetchNotes() {
+    // Make API request to send OTP to the email
+    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/uploads/obsidian`;
+    const options: RequestUrlParam = {
+      url: url,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': '69420',
+        user: `${this.settings.jwtToken}`,
+      },
+    };
+
+    try {
+      const response = await request(options);
+      const res = JSON.parse(response);
+
+      if (res.error) {
+        throw new Error(res.message);
+      }
+      if (res.length !== 0) {
+        if (this.settings.createSeparateNotes) {
+          res.forEach(async (upload: Upload) => {
+            await this.app.vault.create(
+              `${upload.label}.md`,
+              `${upload.transcription} \n [audio](${upload.url})`
+            );
+            await this.updateNote(upload.id);
+          });
+        } else {
+          this.modifyFile(res);
+        }
+      } else {
+        return;
+      }
+    } catch (err) {
+      new Notice(err.message || 'Unknown error');
+    }
+  }
+
+  async modifyFile(res: Upload[]) {
+    const combinedFilePath = 'Epiphany Notes.md';
+    let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
+
+    // If the file doesn't exist, create it
+    if (!combinedFile) {
+      combinedFile = await this.app.vault.create(combinedFilePath, '');
+    }
+
+    // Read the current content of the file
+    let combinedContent = await this.app.vault.read(combinedFile);
+
+    // Append each note to the combined content
+    res.forEach(async (upload) => {
+      const noteContent = `## ${upload.label} \n ${upload.transcription} \n [audio](${upload.url})\n\n`;
+      combinedContent += noteContent;
+      await this.updateNote(upload.id);
+    });
+
+    // Write the combined content back to the file
+    await this.app.vault.modify(combinedFile, combinedContent);
+  }
+
+  async updateNote(id: string) {
+    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/uploads/obsidian/sync/${id}`;
+    const options: RequestUrlParam = {
+      url: url,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+
+    try {
+      const response = await request(options);
+      const res = JSON.parse(response);
+
+      if (res.error) {
+        throw new Error(res.message);
+      }
+    } catch (err) {
+      new Notice(err.message || 'Unknown error');
+    }
+  }
+
   async onload() {
     await this.loadSettings();
-    new Notice('Plugin Re-Loaded! testing');
-    // This creates an icon in the left ribbon.
-    const ribbonIconEl = this.addRibbonIcon(
-      'dice',
-      'Sample Plugin',
-      (evt: MouseEvent) => {
-        // Called when the user clicks the icon.
-        new Notice('This is a notice!');
-      }
-    );
-    // Perform additional things with the ribbon
-    ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-    const statusBarItemEl = this.addStatusBarItem();
-    statusBarItemEl.setText('Status Bar Text');
+    if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+      this.fetchNotes();
+    } else {
+      new Notice('please login to epiphany plugin');
+      this.openEmailView();
+    }
 
     this.registerView(
       VIEW_TYPE_EMAIL,
@@ -149,69 +231,6 @@ export default class MyPlugin extends Plugin {
       id: 'open-email-view',
       name: 'Enter Email',
       callback: () => this.openEmailView(),
-    });
-
-    // This adds a simple command that can be triggered anywhere
-    this.addCommand({
-      id: 'custom-command',
-      name: 'Custom command',
-      callback: async () => {
-        try {
-          // Fetch data from a public API (e.g., a joke API)
-          const response = await fetch(
-            'https://official-joke-api.appspot.com/random_joke'
-          );
-          const data = await response.json();
-
-          const newFile = await this.app.vault.create(
-            `${data.setup}.md`,
-            data.punchline
-          );
-
-          const leaf = this.app.workspace.getLeaf(true);
-          await leaf.openFile(newFile);
-        } catch (error) {
-          new Notice('Error fetching data. Check console for details.');
-        }
-      },
-    });
-
-    // This adds a simple command that can be triggered anywhere
-    this.addCommand({
-      id: 'open-sample-modal-simple',
-      name: 'Open sample modal (simple)',
-      callback: () => {
-        new SampleModal(this.app).open();
-      },
-    });
-    // This adds an editor command that can perform some operation on the current editor instance
-    this.addCommand({
-      id: 'sample-editor-command',
-      name: 'Sample editor command',
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        console.log(editor.getSelection());
-        editor.replaceSelection('Sample Editor Command');
-      },
-    });
-    // This adds a complex command that can check whether the current state of the app allows execution of the command
-    this.addCommand({
-      id: 'open-sample-modal-complex',
-      name: 'Open sample modal (complex)',
-      checkCallback: (checking: boolean) => {
-        // Conditions to check
-        const markdownView =
-          this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (markdownView) {
-          // If checking is true, we're simply "checking" if the command can be run.
-          // If checking is false, then we want to actually perform the operation.
-          if (!checking) {
-            new SampleModal(this.app).open();
-          }
-
-          // This command will only show up in Command Palette when the check function returns true
-          return true;
-        }
-      },
     });
 
     // This adds a settings tab so the user can configure various aspects of the plugin
@@ -238,22 +257,6 @@ export default class MyPlugin extends Plugin {
   }
 }
 
-class SampleModal extends Modal {
-  constructor(app: App) {
-    super(app);
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.setText('Woah!');
-  }
-
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-}
-
 class SampleSettingTab extends PluginSettingTab {
   plugin: MyPlugin;
 
@@ -276,6 +279,18 @@ class SampleSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.mySetting)
           .onChange(async (value) => {
             this.plugin.settings.mySetting = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Create separate notes')
+      .setDesc('Create separate file for each epiphany note')
+      .addToggle((value) =>
+        value
+          .setValue(this.plugin.settings.createSeparateNotes)
+          .onChange(async (value) => {
+            this.plugin.settings.createSeparateNotes = value;
             await this.plugin.saveSettings();
           })
       );
