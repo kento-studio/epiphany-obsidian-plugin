@@ -14,12 +14,14 @@ import { OTPView, VIEW_TYPE_OTP } from './otp-view';
 
 interface MyPluginSettings {
   mySetting: string;
+  baseUrl: string;
   jwtToken: string | null;
   createSeparateNotes: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
   mySetting: 'default',
+  baseUrl: 'http://localhost:3333',
   jwtToken: 'testing test',
   createSeparateNotes: false,
 };
@@ -36,9 +38,11 @@ type Upload = {
 export default class MyPlugin extends Plugin {
   settings: MyPluginSettings;
   private authRequestId: string | null = null;
-  private jwtToken: string | null = null; // Declare jwtToken here
+  private isLoginOpen = false;
+  private jwtToken: string | null = null;
 
   async openEmailView() {
+    this.isLoginOpen = true;
     const leaf = this.app.workspace.getLeaf(true);
     await leaf.setViewState({
       type: VIEW_TYPE_EMAIL,
@@ -57,8 +61,7 @@ export default class MyPlugin extends Plugin {
   }
 
   async handleEmailSubmit(email: string) {
-    // Make API request to send OTP to the email
-    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/auth/login`;
+    const url = `${this.settings.baseUrl}/api/auth/login`;
     const options: RequestUrlParam = {
       url: url,
       method: 'POST',
@@ -85,13 +88,12 @@ export default class MyPlugin extends Plugin {
   }
 
   async handleOTPSubmit(otp: string) {
-    // Handle OTP submission logic
     if (!this.authRequestId) {
       new Notice('No auth request ID found. Please start the process again.');
       return;
     }
 
-    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/auth/verify-code`;
+    const url = `${this.settings.baseUrl}/api/auth/verify-code`;
     const options: RequestUrlParam = {
       url: url,
       method: 'POST',
@@ -115,6 +117,7 @@ export default class MyPlugin extends Plugin {
       await this.saveSettings();
 
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OTP);
+      this.isLoginOpen = false;
       new Notice('Login successful!');
     } catch (err) {
       new Notice(err.message || 'Unknown error');
@@ -122,8 +125,7 @@ export default class MyPlugin extends Plugin {
   }
 
   async fetchNotes() {
-    // Make API request to send OTP to the email
-    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/uploads/obsidian`;
+    const url = `${this.settings.baseUrl}/api/uploads/obsidian`;
     const options: RequestUrlParam = {
       url: url,
       method: 'GET',
@@ -165,12 +167,10 @@ export default class MyPlugin extends Plugin {
     const combinedFilePath = 'Epiphany Notes.md';
     let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
 
-    // If the file doesn't exist, create it
     if (!combinedFile) {
       combinedFile = await this.app.vault.create(combinedFilePath, '');
     }
 
-    // Read the current content of the file
     let combinedContent = await this.app.vault.read(combinedFile);
 
     // Append each note to the combined content
@@ -180,12 +180,11 @@ export default class MyPlugin extends Plugin {
       await this.updateNote(upload.id);
     });
 
-    // Write the combined content back to the file
     await this.app.vault.modify(combinedFile, combinedContent);
   }
 
   async updateNote(id: string) {
-    const url = `https://98d0-81-133-73-3.ngrok-free.app/api/uploads/obsidian/sync/${id}`;
+    const url = `${this.settings.baseUrl}/api/uploads/obsidian/sync/${id}`;
     const options: RequestUrlParam = {
       url: url,
       method: 'POST',
@@ -210,9 +209,11 @@ export default class MyPlugin extends Plugin {
     await this.loadSettings();
     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
       this.fetchNotes();
-    } else {
-      new Notice('please login to epiphany plugin');
-      this.openEmailView();
+    } else if (!this.isLoginOpen) {
+      setTimeout(() => {
+		console.log('here is it')
+        this.openEmailView();
+      }, 200);
     }
 
     this.registerView(
@@ -242,10 +243,15 @@ export default class MyPlugin extends Plugin {
       console.log('click', evt);
     });
 
-    // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-    this.registerInterval(
-      window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)
-    );
+    // this.registerInterval(
+    //   window.setInterval(() => {
+    //     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+    //       this.fetchNotes();
+    //     } else if (!this.isLoginOpen) {
+    //       this.openEmailView();
+    //     }
+    //   }, 0.5 * 60 * 1000)
+    // );
   }
 
   async loadSettings() {

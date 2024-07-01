@@ -17,7 +17,7 @@ export class EmailView extends ItemView {
     }
 
     getDisplayText() {
-        return "Enter Email";
+        return "Login to epiphany account";
     }
 
     async onOpen() {
