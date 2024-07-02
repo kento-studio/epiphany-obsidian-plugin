@@ -131,8 +131,8 @@ export default class MyPlugin extends Plugin {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+		'Authorization': `Bearer ${this.settings.jwtToken}`,
         'ngrok-skip-browser-warning': '69420',
-        user: `${this.settings.jwtToken}`,
       },
     };
 
@@ -189,6 +189,7 @@ export default class MyPlugin extends Plugin {
       url: url,
       method: 'POST',
       headers: {
+		'Authorization': `Bearer ${this.settings.jwtToken}`,
         'Content-Type': 'application/json',
       },
     };
@@ -243,15 +244,15 @@ export default class MyPlugin extends Plugin {
       console.log('click', evt);
     });
 
-    // this.registerInterval(
-    //   window.setInterval(() => {
-    //     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
-    //       this.fetchNotes();
-    //     } else if (!this.isLoginOpen) {
-    //       this.openEmailView();
-    //     }
-    //   }, 0.5 * 60 * 1000)
-    // );
+    this.registerInterval(
+      window.setInterval(() => {
+        if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+          this.fetchNotes();
+        } else if (!this.isLoginOpen) {
+          this.openEmailView();
+        }
+      }, 0.5 * 60 * 1000)
+    );
   }
 
   async loadSettings() {
