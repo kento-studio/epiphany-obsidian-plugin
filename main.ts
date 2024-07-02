@@ -22,7 +22,7 @@ interface MyPluginSettings {
 const DEFAULT_SETTINGS: MyPluginSettings = {
   mySetting: 'default',
   baseUrl: 'http://localhost:3333',
-  jwtToken: 'testing test',
+  jwtToken: null,
   createSeparateNotes: false,
 };
 
@@ -212,7 +212,6 @@ export default class MyPlugin extends Plugin {
       this.fetchNotes();
     } else if (!this.isLoginOpen) {
       setTimeout(() => {
-		console.log('here is it')
         this.openEmailView();
       }, 200);
     }
