@@ -36,7 +36,6 @@ export default class EpiphanyPlugin extends Plugin {
   settings: EpiphanySettings;
   private authRequestId: string | null = null;
   private isLoginOpen = false;
-  private jwtToken: string | null = null;
 
   async openEmailView() {
     this.isLoginOpen = true;
@@ -107,8 +106,6 @@ export default class EpiphanyPlugin extends Plugin {
       if (res.error) {
         throw new Error(res.message);
       }
-
-      this.jwtToken = res.jwt_token;
 
       this.settings.jwtToken = res.jwt_token;
       await this.saveSettings();
