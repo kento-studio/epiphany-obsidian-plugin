@@ -231,7 +231,6 @@ export default class EpiphanyPlugin extends Plugin {
       callback: () => this.openEmailView(),
     });
 
-    // This adds a settings tab so the user can configure various aspects of the plugin
     this.addSettingTab(new EpiphanySettingTab(this.app, this));
 
     this.registerInterval(
