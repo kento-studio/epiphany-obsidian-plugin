@@ -10,18 +10,15 @@ import {
 } from 'obsidian';
 import { EmailView, VIEW_TYPE_EMAIL } from './email-view';
 import { OTPView, VIEW_TYPE_OTP } from './otp-view';
-// Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
-  mySetting: string;
+interface EpiphanySettings {
   baseUrl: string;
   jwtToken: string | null;
   createSeparateNotes: boolean;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-  mySetting: 'default',
-  baseUrl: 'http://localhost:3333',
+const DEFAULT_SETTINGS: EpiphanySettings = {
+  baseUrl: 'https://api-v2.epiphanyvoice.app',
   jwtToken: null,
   createSeparateNotes: false,
 };
@@ -35,8 +32,8 @@ type Upload = {
   createdAt?: Date;
 };
 
-export default class MyPlugin extends Plugin {
-  settings: MyPluginSettings;
+export default class EpiphanyPlugin extends Plugin {
+  settings: EpiphanySettings;
   private authRequestId: string | null = null;
   private isLoginOpen = false;
   private jwtToken: string | null = null;
@@ -235,13 +232,7 @@ export default class MyPlugin extends Plugin {
     });
 
     // This adds a settings tab so the user can configure various aspects of the plugin
-    this.addSettingTab(new SampleSettingTab(this.app, this));
-
-    // If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-    // Using this function will automatically remove the event listener when this plugin is disabled.
-    this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-      console.log('click', evt);
-    });
+    this.addSettingTab(new EpiphanySettingTab(this.app, this));
 
     this.registerInterval(
       window.setInterval(() => {
@@ -263,10 +254,10 @@ export default class MyPlugin extends Plugin {
   }
 }
 
-class SampleSettingTab extends PluginSettingTab {
-  plugin: MyPlugin;
+class EpiphanySettingTab extends PluginSettingTab {
+  plugin: EpiphanyPlugin;
 
-  constructor(app: App, plugin: MyPlugin) {
+  constructor(app: App, plugin: EpiphanyPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -275,19 +266,6 @@ class SampleSettingTab extends PluginSettingTab {
     const { containerEl } = this;
 
     containerEl.empty();
-
-    new Setting(containerEl)
-      .setName('Setting #1')
-      .setDesc("It's a secret")
-      .addText((text) =>
-        text
-          .setPlaceholder('Enter your secret')
-          .setValue(this.plugin.settings.mySetting)
-          .onChange(async (value) => {
-            this.plugin.settings.mySetting = value;
-            await this.plugin.saveSettings();
-          })
-      );
 
     new Setting(containerEl)
       .setName('Create separate notes')
