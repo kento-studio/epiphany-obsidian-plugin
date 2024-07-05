@@ -30,6 +30,8 @@ type Upload = {
   url: string;
   transcription: string;
   createdAt?: Date;
+  createSeparate?: boolean;
+  fileName: string;
 };
 
 export default class EpiphanyPlugin extends Plugin {
@@ -125,7 +127,7 @@ export default class EpiphanyPlugin extends Plugin {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-		'Authorization': `Bearer ${this.settings.jwtToken}`,
+        Authorization: `Bearer ${this.settings.jwtToken}`,
         'ngrok-skip-browser-warning': '69420',
       },
     };
@@ -138,17 +140,17 @@ export default class EpiphanyPlugin extends Plugin {
         throw new Error(res.message);
       }
       if (res.length !== 0) {
-        if (this.settings.createSeparateNotes) {
-          res.forEach(async (upload: Upload) => {
+        res.forEach(async (upload: Upload) => {
+          if (upload.createSeparate) {
             await this.app.vault.create(
               `${upload.label}.md`,
               `${upload.transcription} \n [audio](${upload.url})`
             );
             await this.updateNote(upload.id);
-          });
-        } else {
-          this.modifyFile(res);
-        }
+          } else {
+            await this.modifyFile(upload, upload.fileName);
+          }
+        });
       } else {
         return;
       }
@@ -157,8 +159,8 @@ export default class EpiphanyPlugin extends Plugin {
     }
   }
 
-  async modifyFile(res: Upload[]) {
-    const combinedFilePath = 'Epiphany Notes.md';
+  async modifyFile(upload: Upload, fileName: string) {
+    const combinedFilePath = fileName + '.md';
     let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
 
     if (!combinedFile) {
@@ -167,12 +169,9 @@ export default class EpiphanyPlugin extends Plugin {
 
     let combinedContent = await this.app.vault.read(combinedFile);
 
-    // Append each note to the combined content
-    res.forEach(async (upload) => {
-      const noteContent = `## ${upload.label} \n ${upload.transcription} \n [audio](${upload.url})\n\n`;
-      combinedContent += noteContent;
-      await this.updateNote(upload.id);
-    });
+    const noteContent = `\n\n ## ${upload.label} \n ${upload.transcription} \n [audio](${upload.url})`;
+    combinedContent += noteContent;
+    await this.updateNote(upload.id);
 
     await this.app.vault.modify(combinedFile, combinedContent);
   }
@@ -183,7 +182,7 @@ export default class EpiphanyPlugin extends Plugin {
       url: url,
       method: 'POST',
       headers: {
-		'Authorization': `Bearer ${this.settings.jwtToken}`,
+        Authorization: `Bearer ${this.settings.jwtToken}`,
         'Content-Type': 'application/json',
       },
     };
@@ -230,15 +229,15 @@ export default class EpiphanyPlugin extends Plugin {
 
     this.addSettingTab(new EpiphanySettingTab(this.app, this));
 
-    this.registerInterval(
-      window.setInterval(() => {
-        if (this.settings.jwtToken && this.settings.jwtToken !== '') {
-          this.fetchNotes();
-        } else if (!this.isLoginOpen) {
-          this.openEmailView();
-        }
-      }, 0.5 * 60 * 1000)
-    );
+    // this.registerInterval(
+    //   window.setInterval(() => {
+    //     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+    //       this.fetchNotes();
+    //     } else if (!this.isLoginOpen) {
+    //       this.openEmailView();
+    //     }
+    //   }, 0.5 * 60 * 1000)
+    // );
   }
 
   async loadSettings() {
