@@ -229,15 +229,15 @@ export default class EpiphanyPlugin extends Plugin {
 
     this.addSettingTab(new EpiphanySettingTab(this.app, this));
 
-    // this.registerInterval(
-    //   window.setInterval(() => {
-    //     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
-    //       this.fetchNotes();
-    //     } else if (!this.isLoginOpen) {
-    //       this.openEmailView();
-    //     }
-    //   }, 0.5 * 60 * 1000)
-    // );
+    this.registerInterval(
+      window.setInterval(() => {
+        if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+          this.fetchNotes();
+        } else if (!this.isLoginOpen) {
+          this.openEmailView();
+        }
+      }, 0.5 * 60 * 1000)
+    );
   }
 
   async loadSettings() {
