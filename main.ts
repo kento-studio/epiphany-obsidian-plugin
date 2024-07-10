@@ -1,5 +1,6 @@
 import {
   App,
+  FileSystemAdapter,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -32,6 +33,7 @@ type Upload = {
   createdAt?: Date;
   createSeparate?: boolean;
   fileName: string;
+  vaultPath: string;
 };
 
 export default class EpiphanyPlugin extends Plugin {
@@ -141,14 +143,16 @@ export default class EpiphanyPlugin extends Plugin {
       }
       if (res.length !== 0) {
         res.forEach(async (upload: Upload) => {
-          if (upload.createSeparate) {
-            await this.app.vault.create(
-              `${upload.label}.md`,
-              `${upload.transcription} \n [audio](${upload.url})`
-            );
-            await this.updateNote(upload.id);
-          } else {
-            await this.modifyFile(upload, upload.fileName);
+          if (upload.vaultPath === this.getVaultPath()) {
+            if (upload.createSeparate) {
+              await this.app.vault.create(
+                `${upload.label}.md`,
+                `${upload.transcription} \n [audio](${upload.url})`
+              );
+              await this.updateNote(upload.id);
+            } else {
+              await this.modifyFile(upload, upload.fileName);
+            }
           }
         });
       } else {
@@ -160,7 +164,7 @@ export default class EpiphanyPlugin extends Plugin {
   }
 
   async modifyFile(upload: Upload, fileName: string) {
-    const combinedFilePath = fileName + '.md';
+    const combinedFilePath = fileName;
     let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
 
     if (!combinedFile) {
@@ -199,6 +203,44 @@ export default class EpiphanyPlugin extends Plugin {
     }
   }
 
+  getVaultPath() {
+    const adapter = this.app.vault.adapter;
+    if (adapter instanceof FileSystemAdapter) {
+      return adapter.getBasePath();
+    }
+    return null;
+  }
+
+  async updateFiles() {
+    const vault_path = this.getVaultPath();
+    const vault_name = this.app.vault.getName();
+    const files = this.app.vault.getMarkdownFiles().map((file) => {
+      return { name: file.name, path: file.path };
+    });
+
+    const url = `${this.settings.baseUrl}/api/uploads/obsidian/update-vault`;
+    const options: RequestUrlParam = {
+      url: url,
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.settings.jwtToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ files, vault_name, vault_path }),
+    };
+
+    try {
+      const response = await request(options);
+      const res = JSON.parse(response);
+
+      if (res.error) {
+        throw new Error(res.message);
+      }
+    } catch (err) {
+      new Notice(err.message || 'Unknown error');
+    }
+  }
+
   async onload() {
     await this.loadSettings();
     if (this.settings.jwtToken && this.settings.jwtToken !== '') {
@@ -208,6 +250,19 @@ export default class EpiphanyPlugin extends Plugin {
         this.openEmailView();
       }, 200);
     }
+
+    this.app.workspace.onLayoutReady(async () => {
+      await this.updateFiles();
+      this.registerEvent(
+        this.app.vault.on('create', async () => await this.updateFiles())
+      );
+      this.registerEvent(
+        this.app.vault.on('delete', async () => await this.updateFiles())
+      );
+      this.registerEvent(
+        this.app.vault.on('rename', async () => await this.updateFiles())
+      );
+    });
 
     this.registerView(
       VIEW_TYPE_EMAIL,
