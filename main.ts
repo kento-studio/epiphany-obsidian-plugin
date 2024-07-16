@@ -207,51 +207,54 @@ export default class EpiphanyPlugin extends Plugin {
     const adapter = this.app.vault.adapter;
     if (adapter instanceof FileSystemAdapter) {
       return adapter.getBasePath();
+    } else {
+      //@ts-ignore
+      return adapter.basePath
     }
-    return null;
   }
 
   async updateFiles() {
-    const vault_path = this.getVaultPath();
-    const vault_name = this.app.vault.getName();
-    const files = this.app.vault.getMarkdownFiles().map((file) => {
-      return { name: file.name, path: file.path };
-    });
+    if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+      const vault_path = this.getVaultPath();
+      const vault_name = this.app.vault.getName();
+      const files = this.app.vault.getMarkdownFiles().map((file) => {
+        return { name: file.name, path: file.path };
+      });
 
-    const url = `${this.settings.baseUrl}/api/uploads/obsidian/update-vault`;
-    const options: RequestUrlParam = {
-      url: url,
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.settings.jwtToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ files, vault_name, vault_path }),
-    };
+      const url = `${this.settings.baseUrl}/api/uploads/obsidian/update-vault`;
+      const options: RequestUrlParam = {
+        url: url,
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.settings.jwtToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ files, vault_name, vault_path }),
+      };
 
-    try {
-      const response = await request(options);
-      const res = JSON.parse(response);
+      try {
+        const response = await request(options);
+        const res = JSON.parse(response);
 
-      if (res.error) {
-        throw new Error(res.message);
+        if (res.error) {
+          throw new Error(res.message);
+        }
+      } catch (err) {
+        new Notice(err.message || 'Unknown error');
       }
-    } catch (err) {
-      new Notice(err.message || 'Unknown error');
+    } else if (!this.isLoginOpen) {
+      this.openEmailView();
     }
   }
 
   async onload() {
     await this.loadSettings();
-    if (this.settings.jwtToken && this.settings.jwtToken !== '') {
-      this.fetchNotes();
-    } else if (!this.isLoginOpen) {
-      setTimeout(() => {
-        this.openEmailView();
-      }, 200);
-    }
-
     this.app.workspace.onLayoutReady(async () => {
+      if (this.settings.jwtToken && this.settings.jwtToken !== '') {
+        this.fetchNotes();
+      } else if (!this.isLoginOpen) {
+        this.openEmailView();
+      }
       await this.updateFiles();
       this.registerEvent(
         this.app.vault.on('create', async () => await this.updateFiles())
