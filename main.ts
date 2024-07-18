@@ -117,8 +117,8 @@ export default class EpiphanyPlugin extends Plugin {
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OTP);
       this.isLoginOpen = false;
       new Notice('Login successful!');
-      await this.fetchNotes()
-      await this.updateFiles()
+      await this.fetchNotes();
+      await this.updateFiles();
     } catch (err) {
       new Notice(err.message || 'Unknown error');
     }
@@ -211,7 +211,7 @@ export default class EpiphanyPlugin extends Plugin {
       return adapter.getBasePath();
     } else {
       //@ts-ignore
-      return adapter.basePath
+      return adapter.basePath;
     }
   }
 
@@ -238,15 +238,45 @@ export default class EpiphanyPlugin extends Plugin {
         const response = await request(options);
         const res = JSON.parse(response);
 
+        this.writeLogsToFile(`(sync vault files) ${res.name} ${res.name && res.path && '- saved successfully'}`)
         if (res.error) {
           throw new Error(res.message);
         }
       } catch (err) {
+        this.writeLogsToFile(`(sync vault files) ${err.message}`)
         new Notice(err.message || 'Unknown error');
       }
     } else if (!this.isLoginOpen) {
       this.openEmailView();
     }
+  }
+
+  async writeLogsToFile(message: string) {
+    const now = new Date();
+    const formattedTime = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const formattedDate = now.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const combinedFilePath = 'Epiphany-Plugin-logs.md';
+    let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
+
+    if (!combinedFile) {
+      combinedFile = await this.app.vault.create(combinedFilePath, '');
+    }
+
+    let combinedContent = await this.app.vault.read(combinedFile);
+
+    const noteContent = `\n\n [${formattedDate} ${formattedTime}] - ${message}`;
+    combinedContent += noteContent;
+
+    await this.app.vault.modify(combinedFile, combinedContent);
   }
 
   async onload() {
@@ -296,7 +326,7 @@ export default class EpiphanyPlugin extends Plugin {
         } else if (!this.isLoginOpen) {
           this.openEmailView();
         }
-      }, 0.5 * 60 * 1000)
+      }, 0.1 * 60 * 1000)
     );
   }
 
