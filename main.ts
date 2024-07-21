@@ -117,9 +117,11 @@ export default class EpiphanyPlugin extends Plugin {
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OTP);
       this.isLoginOpen = false;
       new Notice('Login successful!');
+      this.writeLogsToFile(`(handle otp submit) successful`)
       await this.fetchNotes();
       await this.updateFiles();
     } catch (err) {
+      this.writeLogsToFile(`(handle otp submit) ${err.message}`)
       new Notice(err.message || 'Unknown error');
     }
   }
