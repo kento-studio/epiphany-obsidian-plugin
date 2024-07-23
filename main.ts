@@ -19,7 +19,7 @@ interface EpiphanySettings {
 }
 
 const DEFAULT_SETTINGS: EpiphanySettings = {
-  baseUrl: 'https://3867-79-110-203-222.ngrok-free.app',
+  baseUrl: 'https://api-v2.epiphanyvoice.app',
   jwtToken: null,
   createSeparateNotes: false,
 };
@@ -76,7 +76,6 @@ export default class EpiphanyPlugin extends Plugin {
       const res = JSON.parse(response);
 
       if (res.error) {
-        this.writeLogsToFile(`(handle email submit) ${res.message}`);
         throw new Error(res.message);
       }
       this.authRequestId = res.auth_request_id;
@@ -84,7 +83,6 @@ export default class EpiphanyPlugin extends Plugin {
       this.openOTPView();
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_EMAIL);
     } catch (err) {
-      this.writeLogsToFile(`(handle email submit) ${err.message}`);
       new Notice(err.message || 'Unknown error');
     }
   }
@@ -110,7 +108,6 @@ export default class EpiphanyPlugin extends Plugin {
       const res = JSON.parse(response);
 
       if (res.error) {
-        this.writeLogsToFile(`(handle otp submit) ${res.message}`);
         throw new Error(res.message);
       }
 
@@ -120,11 +117,9 @@ export default class EpiphanyPlugin extends Plugin {
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OTP);
       this.isLoginOpen = false;
       new Notice('Login successful!');
-      this.writeLogsToFile(`(handle otp submit) successful`);
       await this.fetchNotes();
       await this.updateFiles();
     } catch (err) {
-      this.writeLogsToFile(`(handle otp submit) ${err.message}`);
       new Notice(err.message || 'Unknown error');
     }
   }
@@ -243,16 +238,10 @@ export default class EpiphanyPlugin extends Plugin {
         const response = await request(options);
         const res = JSON.parse(response);
 
-        this.writeLogsToFile(
-          `(sync vault files) ${res.name} ${
-            res.name && res.path && '- saved successfully'
-          }`
-        );
         if (res.error) {
           throw new Error(res.message);
         }
       } catch (err) {
-        this.writeLogsToFile(`(sync vault files) ${err.message}`);
         new Notice(err.message || 'Unknown error');
       }
     } else if (!this.isLoginOpen) {
@@ -260,39 +249,12 @@ export default class EpiphanyPlugin extends Plugin {
     }
   }
 
-  async writeLogsToFile(message: string) {
-    const now = new Date();
-    const formattedTime = now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-    const formattedDate = now.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const combinedFilePath = 'Epiphany-Plugin-logs.md';
-    let combinedFile = await this.app.vault.getFileByPath(combinedFilePath);
-
-    if (!combinedFile) {
-      combinedFile = await this.app.vault.create(combinedFilePath, '');
-    }
-
-    let combinedContent = await this.app.vault.read(combinedFile);
-
-    const noteContent = `\n\n [${formattedDate} ${formattedTime}] - ${message}`;
-    combinedContent += noteContent;
-
-    await this.app.vault.modify(combinedFile, combinedContent);
-  }
 
   async onload() {
     await this.loadSettings();
     this.app.workspace.onLayoutReady(async () => {
-      this.settings.baseUrl = 'https://3867-79-110-203-222.ngrok-free.app';
-      await this.saveSettings();
+      this.settings.baseUrl = 'https://api-v2.epiphanyvoice.app';
+      await this.saveSettings()
       if (this.settings.jwtToken && this.settings.jwtToken !== '') {
         this.fetchNotes();
       } else if (!this.isLoginOpen) {
